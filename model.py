@@ -18,8 +18,18 @@ __device__ float warp_reduce_sum(float val) {
     return val;
 }
 
-# Step 2 - warp_reduce_max (not yet solved)
-# TODO: implement
+# Step 2 - warp_reduce_max
+__device__ float warp_reduce_max(float val) {
+    // TODO: implement warp-level max reduction using shuffle intrinsics
+    constexpr unsigned FULL_MASK = 0xffffffffu;
+
+    for (int offset = 16; offset > 0; offset /= 2) {
+        float other = __shfl_xor_sync(FULL_MASK, val, offset);
+        val = val > other ? val : other;
+    }
+
+    return val;
+}
 
 # Step 3 - block_reduce_sum (not yet solved)
 # TODO: implement
