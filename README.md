@@ -15,7 +15,7 @@ python scaffold.py
 - [ ] **3.** block_reduce_sum
 - [ ] **4.** block_reduce_max
 - [x] **5.** add_residual_kernel
-- [ ] **6.** gelu_kernel
+- [x] **6.** gelu_kernel
 - [ ] **7.** silu_kernel
 - [ ] **8.** swiglu_kernel
 - [ ] **9.** rmsnorm_kernel
