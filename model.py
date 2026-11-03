@@ -37,8 +37,18 @@ __device__ float warp_reduce_max(float val) {
 # Step 4 - block_reduce_max (not yet solved)
 # TODO: implement
 
-# Step 5 - add_residual_kernel (not yet solved)
-# TODO: implement
+# Step 5 - add_residual_kernel
+__global__ void add_residual_kernel(const float* x, const float* residual,
+                                    float* out, int n) {
+  // TODO: implement elementwise residual addition out[i] = x[i] + residual[i]
+  (void)x; (void)residual; (void)out; (void)n;
+
+  int idx = blockDim.x * blockIdx.x + threadIdx.x;
+
+  if (idx < n) {
+    out[idx] = x[idx] + residual[idx];
+  }
+}
 
 # Step 6 - gelu_kernel (not yet solved)
 # TODO: implement
