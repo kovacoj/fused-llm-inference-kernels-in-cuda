@@ -76,8 +76,52 @@ __device__ float block_reduce_sum(float val, float* shared) {
     return 0.0f;
 }
 
-# Step 4 - block_reduce_max (not yet solved)
-# TODO: implement
+# Step 4 - block_reduce_max
+__device__ float block_reduce_max(float val, float* shared) {
+    __shared__ float tail[32];
+
+    const int tid = threadIdx.x;
+    const int lane = tid % 32;
+    const int warp_id = tid / 32;
+    const int full_warps = blockDim.x / 32;
+    const int tail_size = blockDim.x % 32;
+
+    if (tail_size > 0) {
+        if (warp_id == full_warps)
+            tail[lane] = val;
+
+        __syncthreads();
+
+        // For blocks smaller than a warp, reduce the tail in parallel.
+        if (full_warps == 0) {
+            for (int stride = 16; stride > 0; stride >>= 1) {
+                if (lane < stride && lane + stride < tail_size)
+                    tail[lane] = fmaxf(tail[lane], tail[lane + stride]);
+
+                __syncthreads();
+            }
+            return tid == 0 ? tail[0] : -INFINITY;
+        }
+
+        if (warp_id == 0 && lane < tail_size)
+            val = fmaxf(val, tail[lane]);
+    }
+
+    if (warp_id < full_warps) {
+        float warp_max = warp_reduce_max(val);
+        if (lane == 0)
+            shared[warp_id] = warp_max;
+    }
+
+    __syncthreads();
+
+    if (warp_id == 0) {
+        float partial = lane < full_warps ? shared[lane] : -INFINITY;
+        return warp_reduce_max(partial);
+    }
+
+    return -INFINITY;
+}
 
 # Step 5 - add_residual_kernel
 __global__ void add_residual_kernel(const float* x, const float* residual,
