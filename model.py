@@ -171,8 +171,37 @@ __global__ void swiglu_kernel(const float* gate, const float* up, float* out, in
     }
 }
 
-# Step 9 - rmsnorm_kernel (not yet solved)
-# TODO: implement
+# Step 9 - rmsnorm_kernel
+__global__ void rmsnorm_kernel(
+    const float* x, const float* weight, float* out, int n, float eps)
+{
+    __shared__ float scratch[32];
+    __shared__ float inv_rms;
+
+    const size_t row_offset = static_cast<size_t>(blockIdx.x) * n;
+    const float* x_row = x + row_offset;
+    float* out_row = out + row_offset;
+
+    // Each thread sums the squares of its assigned columns.
+    float sum_sq = 0.0f;
+    for (int i = threadIdx.x; i < n; i += blockDim.x) {
+        float value = x_row[i];
+        sum_sq += value * value;
+    }
+
+    // Every thread contributes. Thread 0 receives the row total.
+    float row_sum_sq = block_reduce_sum(sum_sq, scratch);
+
+    if (threadIdx.x == 0) {
+        inv_rms = rsqrtf(row_sum_sq / n + eps);
+    }
+    __syncthreads();
+
+    // Each thread revisits its columns and writes the result.
+    for (int i = threadIdx.x; i < n; i += blockDim.x) {
+        out_row[i] = x_row[i] * inv_rms * weight[i];
+    }
+}
 
 # Step 10 - layernorm_kernel (not yet solved)
 # TODO: implement
