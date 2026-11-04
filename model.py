@@ -41,35 +41,36 @@ __device__ float block_reduce_sum(float val, float* shared) {
     const int full_warps = blockDim.x / 32;
     const int tail_size = blockDim.x % 32;
 
+    if (tail_size > 0) {
+        if (warp_id == full_warps)
+            tail[lane] = val;
+
+        __syncthreads();
+
+        if (full_warps == 0) {
+            for (int stride = 16; stride > 0; stride >>= 1) {
+                if (lane < stride && lane + stride < tail_size)
+                    tail[lane] += tail[lane + stride];
+
+                __syncthreads();
+            }
+            return tid == 0 ? tail[0] : 0.0f;
+        }
+
+        if (warp_id == 0 && lane < tail_size)
+            val += tail[lane];
+    }
+
     if (warp_id < full_warps) {
-        float warp_sum = warp_reduce_sum(val);
+        float warp_max = warp_reduce_sum(val);
         if (lane == 0)
-            shared[warp_id] = warp_sum;
-    } else {
-        tail[lane] = val;
+            shared[warp_id] = warp_max;
     }
 
     __syncthreads();
 
-    // With fewer than 32 threads, use a parallel shared-memory tree.
-    if (full_warps == 0) {
-        for (int stride = 16; stride > 0; stride >>= 1) {
-            if (lane < stride && lane + stride < tail_size)
-                tail[lane] += tail[lane + stride];
-
-            __syncthreads();
-        }
-        return tid == 0 ? tail[0] : 0.0f;
-    }
-
     if (warp_id == 0) {
-        float partial = 0.0f;
-        const int count = full_warps + tail_size;
-
-        for (int i = lane; i < count; i += 32) {
-            partial += i < full_warps ? shared[i] : tail[i - full_warps];
-        }
-
+        float partial = lane < full_warps ? shared[lane] : 0.0f;
         return warp_reduce_sum(partial);
     }
 
